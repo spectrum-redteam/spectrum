@@ -1,155 +1,186 @@
-================================================================================
-                      SPECTRUM - RED/BLUE TEAM FRAMEWORK
-================================================================================
+# Spectrum – Red/Blue Team AI Framework
 
-Spectrum is a dual‑mode AI‑powered security platform. It can act as:
- - Red Team  : autonomous offensive agent that attacks a target
- - Blue Team : autonomous defensive agent that monitors traffic,
-               detects intrusions and hot‑patches vulnerabilities
+A dual‑mode autonomous security platform.  
+Run as **Red Team** to attack a target, or as **Blue Team** to monitor, detect intrusions and hot‑patch vulnerabilities.  
+Powered by Hugging Face (or AMD Cloud) models.
 
-It uses Hugging Face models (or AMD Cloud) for AI inference and runs
-entirely on your local machine or on other deployments.
+---
 
-================================================================================
- 1. PREREQUISITES
-================================================================================
+## Prerequisites
 
-- Python 3.10 or higher
-- pip (Python package manager)
-- macOS, Linux or Windows (WSL recommended)
-- A Hugging Face account and API token (free tier works)
-- Git (optional, for cloning)
+- Python 3.10 or newer
+- pip
+- A Hugging Face account ([hf.co](https://hf.co)) and an API token
+- Git (optional – you can also download the ZIP)
 
-================================================================================
- 2. CLONE THE PROJECT
-================================================================================
+---
 
+## Clone the project
+
+~~~bash
 git clone https://github.com/yourusername/spectrum.git
 cd spectrum
+~~~
 
-(If you received the files as a ZIP, extract them and open a terminal
-inside the extracted folder.)
+If you downloaded a ZIP, extract it and open a terminal inside the extracted folder.
 
-================================================================================
- 3. INSTALL DEPENDENCIES
-================================================================================
+---
 
-Create a virtual environment (recommended):
+## Install dependencies
 
-    python3 -m venv venv
-    source venv/bin/activate   (macOS/Linux)
-    venv\Scripts\activate      (Windows)
+Create and activate a virtual environment (recommended):
 
-Install required packages:
+~~~bash
+python3 -m venv venv
+source venv/bin/activate       # macOS / Linux
+venv\Scripts\activate          # Windows
+~~~
 
-    pip install -r requirements.txt
+Install the required packages:
+
+~~~bash
+pip install -r requirements.txt
+~~~
 
 On macOS with Homebrew Python you may need:
 
-    pip install --break-system-packages -r requirements.txt
+~~~bash
+pip install --break-system-packages -r requirements.txt
+~~~
 
-================================================================================
- 4. CONFIGURATION
-================================================================================
+---
 
-4.1 Hugging Face Token
+## Configuration
 
-When you first run the program it will ask for your API provider.
-Choose 1 (Hugging Face) and enter your token. The token will be saved
-in a .env file. You can also create that file manually:
+### API Provider & Token
 
-    echo "HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx" > .env
+On the first run, Spectrum asks which provider you want to use:
 
-If you prefer AMD Cloud, choose 2 and provide your AMD_API_KEY.
+1. **Hugging Face** – you will be prompted for your `HF_TOKEN`.
+2. **AMD Cloud** – you will be prompted for your `AMD_API_KEY`.
 
-4.2 Model Selection (config.json)
+The token is saved in a `.env` file.  
+You can also create that file manually:
 
-The default models are already set in config.json. You can change
-"final_model_id" for the main agent and "sentinel_model_id" for the
-lightweight Blue Team watcher.  Any Hugging Face chat model works.
+~~~bash
+echo "HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx" > .env
+~~~
 
-================================================================================
- 5. RUNNING THE APPLICATION
-================================================================================
+(Replace `hf_xxxxxxxxxxxxxxxxxxxx` with your actual token.)
 
-5.1 Start a vulnerable target (optional)
+### Model selection (`config.json`)
 
-The project includes a deliberately vulnerable Flask application
-(lab.py).  Start it in a separate terminal:
+The default models work out of the box.  
+You can change `final_model_id` (the main agent) and `sentinel_model_id` (the lightweight Blue Team watcher) inside `config.json`.
 
-    python3 lab.py
+Example excerpt:
 
-It will listen on http://127.0.0.1:4999 (or the port printed in the
-terminal).  This gives the Blue Team something to defend and the Red
-Team something to attack.
+~~~json
+{
+    "final_model_id": "deepseek-ai/DeepSeek-V4-Flash",
+    "sentinel_model_id": "Qwen/Qwen2.5-3B-Instruct"
+}
+~~~
 
-5.2 Launch Spectrum
+---
 
-    python3 main.py
+## Run a vulnerable target (optional)
 
-You will see the Spectrum banner. Press Enter to continue.
+The project includes a deliberately vulnerable Flask application (`lab.py`).  
+Start it in a separate terminal to give the agents something to attack/defend:
 
-5.3 Select Operational Mode
+~~~bash
+python3 lab.py
+~~~
 
-    1 - Red Team  (offensive)
-    2 - Blue Team (defensive)
-    3 - Exit
+It listens on `http://127.0.0.1:4999` (or the port printed in the terminal).
 
-5.4 Red Team Mode
+---
 
-Enter a target / objective, for example:
+## Launch Spectrum
 
-    Target / Objective > Find the hidden flag on http://127.0.0.1:4999
+~~~bash
+python3 main.py
+~~~
 
-The agent will plan, execute terminal commands, write scripts, and
-attempt to breach the target.  You can interrupt with Ctrl+C and
-steer the agent (s), pause/save state (p), or resume.
+You will see the Spectrum banner. Press **Enter** to continue.
 
-5.5 Blue Team Mode
+### Choose your mode
 
-Enter the URL to defend, for example:
+~~~text
+Select Operational Module:
+  1. Red Team (Offensive)
+  2. Blue Team (Defensive)
+  3. Exit
+~~~
 
-    Target / URL to defend > http://127.0.0.1:4999
+---
 
-The Blue Team will first set up logging (kill the existing server,
-restart it with nohup and log to server.log).  Then it uses a small
-Sentinel model to monitor the log.  When an attack is detected it:
-   - Blocks the attacker IP (recorded in blocked_ips.txt)
-   - Asks the main model to classify the attack
-   - Automatically patches the vulnerable code (using internal fixes)
-   - Restarts the server with a fresh log
+### Red Team Mode
 
-You can also interrupt with Ctrl+C and steer, pause or resume.
+1. Enter a target / objective, for example:  
+   `Find the hidden flag on http://127.0.0.1:4999`
+2. The agent will plan, execute terminal commands, write scripts, and attempt to breach the target.
+3. **Ctrl+C** to pause, then:
+   - `s` – steer the agent (give an instruction)
+   - `p` – pause and save the session
+   - `Enter` – resume
 
-================================================================================
- 6. FILE STRUCTURE (key files)
-================================================================================
+---
 
- main.py               Entry point, mode selector
- redteamer.py          Offensive agent logic
- blueteamer.py         Defensive agent (Sentinel + patcher)
- tools.py              Tool implementations (shell, HTTP, file I/O, patching)
- lab.py                Vulnerable SAAS lab (for testing)
- config.json           Model IDs and provider settings
- requirements.txt      Python dependencies
- tutorials/            Optional playbooks loaded by the agents
- blocked_ips.txt       IPs blocked during Blue Team sessions
- attacks.log           Record of detected attacks
- server.log            Flask output (created at runtime)
- session.md            Live session log (viewed by viewer.py)
- thoughts.json         Agent reasoning trail
+### Blue Team Mode
 
-================================================================================
- 7. TROUBLESHOOTING
-================================================================================
+1. Enter the URL to defend, for example:  
+   `http://127.0.0.1:4999`
+2. The Blue Team will:
+   - Kill the existing server (if any) and restart it with logging enabled.
+   - Start a Sentinel (small AI model) that watches the log file every few seconds.
+   - When an attack is detected:
+     - Record the attacker IP (in `blocked_ips.txt`).
+     - Ask the main model to classify the attack.
+     - Automatically patch the vulnerable code (SQLi, command injection, SSTI, etc.).
+     - Restart the server with a fresh log.
+3. **Ctrl+C** to pause, same steering options as Red Team.
 
-- "ModuleNotFoundError": run pip install -r requirements.txt again.
-- "API Quota Exhausted": wait a few minutes or switch to another model.
-- The Blue Team doesn't detect attacks: ensure the target is started
-  with logging (the Blue Team does this automatically for lab.py).
-- Terminal output looks broken: you can run main.py in a standard
-  terminal; Rich formatting works best there.
+---
 
-================================================================================
-For questions or contributions, open an issue on the project's
-GitHub page.
+## File structure (key files)
+
+~~~
+spectrum/
+├── main.py               # Entry point, mode selector
+├── redteamer.py          # Offensive agent logic
+├── blueteamer.py         # Defensive agent (Sentinel + patcher)
+├── tools.py              # Tool implementations (shell, HTTP, file I/O, patch engine)
+├── lab.py                # Vulnerable SAAS lab (for testing)
+├── config.json           # Model IDs and provider settings
+├── requirements.txt      # Python dependencies
+├── tutorials/            # Optional playbooks loaded by agents
+│   ├── BLUE_DEFENSE_PLAYBOOK.md
+│   └── VULNERABLE_APP_SOURCE.txt
+├── blocked_ips.txt       # IPs blocked during Blue Team sessions
+├── attacks.log           # Record of detected attacks
+├── server.log            # Flask output (created at runtime)
+├── session.md            # Live session log (viewed by viewer.py)
+└── thoughts.json         # Agent reasoning trail
+~~~
+
+---
+
+## Troubleshooting
+
+- **ModuleNotFoundError** → run `pip install -r requirements.txt` again.
+- **API Quota Exhausted** → wait a few minutes or switch to another model in `config.json`.
+- **Blue Team doesn't detect attacks** → ensure the target was started with logging (the Blue Team does this automatically for `lab.py`).
+- **Terminal output looks broken** → run `main.py` in a standard terminal; Rich formatting works best there.
+
+---
+
+## Deployment (Hugging Face Spaces / Streamlit Cloud)
+
+The repository includes `app.py` for Streamlit deployment and a `Dockerfile` for Docker Spaces.  
+Refer to the comments in those files for details.
+
+---
+
+For questions or contributions, open an issue on the project's GitHub page.
