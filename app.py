@@ -138,7 +138,6 @@ with c2:
             st.session_state.started = False
 
 terminal = st.empty()
-input_placeholder = st.empty()
 
 if st.session_state.started:
     read_output()
@@ -146,14 +145,19 @@ if st.session_state.started:
         html_output = ansi_to_html(st.session_state.output[-10000:])
     terminal.markdown(f'<div class="terminal">{html_output}</div>', unsafe_allow_html=True)
     
-    user_input = input_placeholder.text_input("", placeholder="Type here...", key="cmd", label_visibility="collapsed")
-    if user_input:
-        send(user_input)
-        time.sleep(0.3)
-        read_output()
-        with st.session_state.lock:
-            html_output = ansi_to_html(st.session_state.output[-10000:])
-        terminal.markdown(f'<div class="terminal">{html_output}</div>', unsafe_allow_html=True)
-        st.rerun()
+    col_input, col_btn = st.columns([4, 1])
+    with col_input:
+        user_input = st.text_input("", placeholder="Type here...", key="cmd", label_visibility="collapsed")
+    with col_btn:
+        if st.button("Send"):
+            if user_input:
+                send(user_input)
+                time.sleep(0.3)
+                read_output()
+                with st.session_state.lock:
+                    html_output = ansi_to_html(st.session_state.output[-10000:])
+                terminal.markdown(f'<div class="terminal">{html_output}</div>', unsafe_allow_html=True)
+                st.session_state.cmd = ""
+                st.rerun()
 else:
     terminal.markdown('<div class="terminal" style="color:#888;">Click Start to launch Spectrum</div>', unsafe_allow_html=True)
