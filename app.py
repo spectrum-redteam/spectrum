@@ -4,7 +4,6 @@ import sys
 import subprocess
 import threading
 import time
-import queue
 import re
 from pathlib import Path
 
@@ -12,9 +11,77 @@ st.set_page_config(page_title="Spectrum", layout="wide")
 
 BASE_DIR = Path(__file__).resolve().parent
 
-def strip_ansi(text):
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    return ansi_escape.sub('', text)
+def ansi_to_html(text):
+    """Convert ANSI escape codes to HTML spans with inline styles."""
+    # Map ANSI color codes to CSS colors
+    color_map = {
+        '30': '#000000', '31': '#ff5555', '32': '#00ff41', '33': '#ffff55',
+        '34': '#5555ff', '35': '#ff55ff', '36': '#55ffff', '37': '#ffffff',
+        '90': '#888888', '91': '#ff8888', '92': '#88ff88', '93': '#ffff88',
+        '94': '#8888ff', '95': '#ff88ff', '96': '#88ffff', '97': '#ffffff',
+        '0': '', '1': 'font-weight:bold;', '2': 'opacity:0.6;', '3': 'font-style:italic;',
+    }
+    
+    # Remove cursor movement and screen clearing codes
+    text = re.sub(r'\x1B\[\d*[HJK]', '', text)
+    text = re.sub(r'\x1B\[\?25[hl]', '', text)
+    text = re.sub(r'\x1B\[\d*;\d*H', '', text)
+    
+    # Replace ANSI sequences with HTML
+    result = []
+    i = 0
+    current_styles = []
+    
+    while i < len(text):
+        if text[i] == '\x1B' and i + 1 < len(text) and text[i+1] == '[':
+            # Find end of ANSI sequence
+            end = text.find('m', i)
+            if end != -1:
+                codes = text[i+2:end].split(';')
+                for code in codes:
+                    if code == '0':
+                        current_styles = []
+                    elif code in color_map:
+                        if code in ['1', '2', '3']:
+                            current_styles.append(color_map[code])
+                        elif len(code) == 2 and code.startswith('3'):
+                            current_styles = [s for s in current_styles if not s.startswith('color')]
+                            current_styles.append(f"color:{color_map[code]};")
+                        elif len(code) == 2 and code.startswith('4'):
+                            current_styles = [s for s in current_styles if not s.startswith('background')]
+                            current_styles.append(f"background-color:{color_map[code]};")
+                        elif code == '38' or code == '48':
+                            pass
+                
+                if current_styles:
+                    result.append(f'<span style="{" ".join(current_styles)}">')
+                else:
+                    result.append('</span>')
+                
+                i = end + 1
+                continue
+        
+        if text[i] == '\n':
+            result.append('<br>')
+        elif text[i] == ' ':
+            result.append('&nbsp;')
+        elif text[i] == '<':
+            result.append('&lt;')
+        elif text[i] == '>':
+            result.append('&gt;')
+        elif text[i] == '&':
+            result.append('&amp;')
+        elif ord(text[i]) >= 32:
+            result.append(text[i])
+        
+        i += 1
+    
+    # Close any open spans
+    open_spans = len([r for r in result if r.startswith('<span')]) - len([r for r in result if r == '</span>'])
+    for _ in range(open_spans):
+        result.append('</span>')
+    
+    return ''.join(result)
 
 if "process" not in st.session_state:
     st.session_state.process = None
@@ -22,15 +89,18 @@ if "output" not in st.session_state:
     st.session_state.output = ""
 if "started" not in st.session_state:
     st.session_state.started = False
+if "lock" not in st.session_state:
+    st.session_state.lock = threading.Lock()
 
 def start():
     if st.session_state.process and st.session_state.process.poll() is None:
         st.session_state.process.terminate()
-    st.session_state.output = ""
+    with st.session_state.lock:
+        st.session_state.output = ""
+    
     env = os.environ.copy()
-    env["TERM"] = "dumb"
-    env["NO_COLOR"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
+    
     st.session_state.process = subprocess.Popen(
         [sys.executable, str(BASE_DIR / "main.py")],
         stdin=subprocess.PIPE,
@@ -50,21 +120,24 @@ def send(text):
 def read_output():
     if st.session_state.process and st.session_state.process.poll() is None:
         import select
-        if select.select([st.session_state.process.stdout], [], [], 0.1)[0]:
+        while select.select([st.session_state.process.stdout], [], [], 0.05)[0]:
             line = st.session_state.process.stdout.readline()
             if line:
-                st.session_state.output += strip_ansi(line)
+                with st.session_state.lock:
+                    st.session_state.output += line
 
 st.markdown("""
 <style>
 .stApp { background: #0a0a0a; }
-input { background: #1a1a1a !important; color: #00ff41 !important; border: 1px solid #333 !important; font-family: Menlo, monospace !important; }
-button { background: #1a1a1a !important; color: #00ff41 !important; border: 1px solid #333 !important; }
-.terminal { background: #0a0a0a; color: #00ff41; padding: 15px; font-family: Menlo, monospace; white-space: pre-wrap; border: 1px solid #333; min-height: 500px; max-height: 65vh; overflow-y: auto; font-size: 13px; }
+.stTextInput > div > div > input { background: #1a1a1a; color: #00ff41; border: 1px solid #333; font-family: Menlo, monospace; font-size: 14px; padding: 10px; }
+.stButton > button { background: #1a1a1a; color: #00ff41; border: 1px solid #333; font-family: Menlo, monospace; }
+.stButton > button:hover { background: #222; border-color: #00ff41; color: #00ff41; }
+.terminal { background: #0a0a0a; padding: 15px; font-family: Menlo, Monaco, monospace; white-space: pre; border: 1px solid #333; min-height: 500px; max-height: 65vh; overflow-y: auto; font-size: 13px; line-height: 1.3; }
+h1 { font-family: Menlo, Monaco, monospace; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='color:#00ff41;font-family:Menlo,monospace;'>Spectrum</h1>", unsafe_allow_html=True)
+st.markdown('<h1 style="color:#00ff41;">Spectrum</h1>', unsafe_allow_html=True)
 
 c1, c2 = st.columns([1, 1])
 with c1:
@@ -77,19 +150,25 @@ with c2:
             st.session_state.started = False
 
 terminal = st.empty()
-cmd = st.empty()
+input_placeholder = st.empty()
 
 if st.session_state.started:
     read_output()
-    terminal.markdown(f'<div class="terminal">{st.session_state.output[-8000:]}</div>', unsafe_allow_html=True)
-    user_input = cmd.text_input("", placeholder="Type here...", key="input", label_visibility="collapsed")
+    with st.session_state.lock:
+        html_output = ansi_to_html(st.session_state.output[-10000:])
+    terminal.markdown(f'<div class="terminal">{html_output}</div>', unsafe_allow_html=True)
+    
+    user_input = input_placeholder.text_input("", placeholder="Type here...", key="cmd", label_visibility="collapsed")
     if user_input:
         send(user_input)
-        time.sleep(0.5)
+        time.sleep(0.3)
         read_output()
-        terminal.markdown(f'<div class="terminal">{st.session_state.output[-8000:]}</div>', unsafe_allow_html=True)
+        with st.session_state.lock:
+            html_output = ansi_to_html(st.session_state.output[-10000:])
+        terminal.markdown(f'<div class="terminal">{html_output}</div>', unsafe_allow_html=True)
         st.rerun()
-    time.sleep(0.5)
+    
+    time.sleep(0.3)
     st.rerun()
 else:
-    terminal.markdown('<div class="terminal">Click Start to launch Spectrum</div>', unsafe_allow_html=True)
+    terminal.markdown('<div class="terminal" style="color:#888;">Click Start to launch Spectrum</div>', unsafe_allow_html=True)
