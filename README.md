@@ -1,4 +1,4 @@
-# Spectrum – Red/Blue Team AI Framework
+# Spectrum – Red/Blue Team
 
 A dual‑mode autonomous security platform.  
 Run as **Red Team** to attack a target, or as **Blue Team** to monitor, detect intrusions and hot‑patch vulnerabilities.  
@@ -10,7 +10,7 @@ Powered by Hugging Face (or AMD Cloud) models.
 
 - Python 3.10 or newer
 - pip
-- A Hugging Face account ([hf.co](https://hf.co)) and an API token
+- A Hugging Face account ([huggingface.co](https://huggingface.co)) and an API token
 - Git (optional – you can also download the ZIP)
 
 ---
@@ -18,7 +18,7 @@ Powered by Hugging Face (or AMD Cloud) models.
 ## Clone the project
 
 ~~~bash
-git clone https://github.com/yourusername/spectrum.git
+git clone https://github.com/spectrum-redteamer/spectrum.git
 cd spectrum
 ~~~
 
@@ -174,13 +174,6 @@ spectrum/
 - **Blue Team doesn't detect attacks** → ensure the target was started with logging (the Blue Team does this automatically for `lab.py`).
 - **Terminal output looks broken** → run `main.py` in a standard terminal; Rich formatting works best there.
 
----
 
-## Deployment (Hugging Face Spaces / Streamlit Cloud)
-
-The repository includes `app.py` for Streamlit deployment and a `Dockerfile` for Docker Spaces.  
-Refer to the comments in those files for details.
-
----
 
 For questions or contributions, open an issue on the project's GitHub page.
