@@ -19,15 +19,19 @@ jobs:
           - os: ubuntu-latest
             target: linux-amd64
             artifact: spectrum-linux-amd64
+            data_sep: ":"
           - os: macos-13
             target: darwin-amd64
             artifact: spectrum-darwin-amd64
+            data_sep: ":"
           - os: macos-latest
             target: darwin-arm64
             artifact: spectrum-darwin-arm64
+            data_sep: ":"
           - os: windows-latest
             target: windows-amd64
             artifact: spectrum-windows-amd64.exe
+            data_sep: ";"
 
     runs-on: ${{ matrix.os }}
 
@@ -47,6 +51,9 @@ jobs:
       - name: Create entry script
         run: |
           echo 'from spectrum.main import main; main()' > run_spectrum.py
+          mkdir -p spectrum/modules
+          touch spectrum/modules/__init__.py
+          cp -r spectrum/modules/hash_util.py spectrum/modules/port_scanner.py 2>/dev/null || true
 
       - name: Build binary
         run: |
@@ -58,7 +65,7 @@ jobs:
             --distpath release \
             --workpath build_temp \
             --specpath build_temp \
-            --add-data "spectrum/modules:spectrum/modules" \
+            --add-data "spectrum/modules${{ matrix.data_sep }}spectrum/modules" \
             --collect-all rich \
             run_spectrum.py
         shell: bash
