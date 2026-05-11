@@ -1,0 +1,87 @@
+name: Build and Release Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag'
+        required: true
+        default: '1.35.17'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            artifact: spectrum-linux-amd64
+          - os: macos-13
+            target: darwin-amd64
+            artifact: spectrum-darwin-amd64
+          - os: macos-latest
+            target: darwin-arm64
+            artifact: spectrum-darwin-arm64
+          - os: windows-latest
+            target: windows-amd64
+            artifact: spectrum-windows-amd64.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install flask gradio rich requests
+
+      - name: Build binary
+        run: |
+          python -c "
+          import PyInstaller.__main__
+          PyInstaller.__main__.run([
+              '--onefile',
+              '--name', '${{ matrix.artifact }}',
+              '--clean',
+              '--noconfirm',
+              '--distpath', 'release',
+              '--workpath', 'build_temp',
+              '--specpath', 'build_temp',
+              '--add-data', 'spectrum/modules:spectrum/modules',
+              '--collect-all', 'rich',
+              '-m', 'spectrum.main',
+          ])
+          "
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: spectrum-*
+          merge-multiple: true
+          path: release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          files: release/spectrum-*
+          generate_release_notes: true
