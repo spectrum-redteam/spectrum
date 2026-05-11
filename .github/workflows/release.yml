@@ -44,23 +44,23 @@ jobs:
           pip install pyinstaller
           pip install flask gradio rich requests
 
+      - name: Create entry script
+        run: |
+          echo 'from spectrum.main import main; main()' > run_spectrum.py
+
       - name: Build binary
         run: |
-          python -c "
-          import PyInstaller.__main__
-          PyInstaller.__main__.run([
-              '--onefile',
-              '--name', '${{ matrix.artifact }}',
-              '--clean',
-              '--noconfirm',
-              '--distpath', 'release',
-              '--workpath', 'build_temp',
-              '--specpath', 'build_temp',
-              '--add-data', 'spectrum/modules:spectrum/modules',
-              '--collect-all', 'rich',
-              '-m', 'spectrum.main',
-          ])
-          "
+          pyinstaller \
+            --onefile \
+            --name ${{ matrix.artifact }} \
+            --clean \
+            --noconfirm \
+            --distpath release \
+            --workpath build_temp \
+            --specpath build_temp \
+            --add-data "spectrum/modules:spectrum/modules" \
+            --collect-all rich \
+            run_spectrum.py
         shell: bash
 
       - name: Upload artifact
