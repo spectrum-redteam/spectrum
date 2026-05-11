@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ### <span style="font-family: 'Glacial Indifference', sans-serif; font-size: 100px;"><span style="color:red">Spec</span><span style="color:blue">trum</span></span>
 ![Spectrum Picture](spectrumpicture.png)
 <p align="center">
