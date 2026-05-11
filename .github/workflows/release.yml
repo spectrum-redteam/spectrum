@@ -51,9 +51,6 @@ jobs:
       - name: Create entry script
         run: |
           echo 'from spectrum.main import main; main()' > run_spectrum.py
-          mkdir -p spectrum/modules
-          touch spectrum/modules/__init__.py
-          cp -r spectrum/modules/hash_util.py spectrum/modules/port_scanner.py 2>/dev/null || true
 
       - name: Build binary
         run: |
@@ -65,8 +62,13 @@ jobs:
             --distpath release \
             --workpath build_temp \
             --specpath build_temp \
-            --add-data "spectrum/modules${{ matrix.data_sep }}spectrum/modules" \
             --collect-all rich \
+            --hidden-import spectrum \
+            --hidden-import spectrum.main \
+            --hidden-import spectrum.redteamer \
+            --hidden-import spectrum.blueteamer \
+            --hidden-import spectrum.tools \
+            --hidden-import spectrum.modules \
             run_spectrum.py
         shell: bash
 
