@@ -1,3 +1,0 @@
-#!/bin/bash
-set -e
-pip3 install spectrum-security 2>/dev/null || pip3 install --user spectrum-security

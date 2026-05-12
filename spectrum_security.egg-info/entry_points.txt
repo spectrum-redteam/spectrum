@@ -1,2 +1,0 @@
-[console_scripts]
-spectrum = spectrum.main:main

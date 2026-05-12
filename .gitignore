@@ -1,1 +1,15 @@
 .env
+
+# Binaries
+*.exe
+spectrum-darwin-*
+spectrum-linux-*
+spectrum-windows-*
+
+# Temp / build artifacts
+.DS_Store
+__pycache__/
+*.pyc
+dist/
+build/
+*.egg-info/

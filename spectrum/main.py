@@ -47,7 +47,7 @@ def main():
     print(chr(27) + "[2J\033[H", end="")
     
     # Claude-style Welcome Box
-    welcome_text = Text("* Welcome to Spectrum Best", style="bold #e6b47c")
+    welcome_text = Text("* Welcome to Spectrum Wonderful", style="bold #e6b47c")
     console.print(Panel(welcome_text, border_style="#e6b47c", expand=False))
     print("\n")
     

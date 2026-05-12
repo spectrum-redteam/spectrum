@@ -1,4 +1,0 @@
-flask
-gradio
-rich
-requests
