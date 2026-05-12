@@ -53,6 +53,10 @@ uvx spectrum-security
 ```bash
 brew install spectrum-security
 ```
+**Portable Release**
+```bash
+./spectrum-darwin-arm64.tar.gz
+```
 #Windows
 **Scoop**
 ```powershell
@@ -337,6 +341,7 @@ On the first run, Spectrum asks which provider you want to use:
 
 1. **Hugging Face** – you will be prompted for your `HF_TOKEN`.
 2. **AMD Cloud** – you will be prompted for your `AMD_API_KEY`.
+3. **Google Gemini**- Experimental, prompted for API key.
 
 The token is saved in a `.env` file.  
 You can also create that file manually:
@@ -435,8 +440,6 @@ spectrum/
 ├── config.json           # Model IDs and provider settings
 ├── requirements.txt      # Python dependencies
 ├── tutorials/            # Optional playbooks loaded by agents
-│   ├── BLUE_DEFENSE_PLAYBOOK.md
-│   └── VULNERABLE_APP_SOURCE.txt
 ├── blocked_ips.txt       # IPs blocked during Blue Team sessions
 ├── attacks.log           # Record of detected attacks
 ├── server.log            # Flask output (created at runtime)
@@ -455,12 +458,5 @@ spectrum/
 
 ---
 
-## Deployment (Hugging Face Spaces / Streamlit Cloud)
-
-The repository includes `app.py` for Streamlit deployment and a `Dockerfile` for Docker Spaces.  
-Refer to the comments in those files for details.
-
----
 
 For questions or contributions, open an issue on the project's GitHub page.
->>>>>>> 6f43fc3 (Add binary build workflow)
