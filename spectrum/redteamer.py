@@ -1,5 +1,13 @@
-import os
-import sys
+import sys, os
+import importlib.util
+
+# Force-load the local providers module to avoid the installed spectrum package
+_prov_path = os.path.join(os.path.dirname(__file__), "providers.py")
+_spec_prov = importlib.util.spec_from_file_location("providers", _prov_path)
+providers = importlib.util.module_from_spec(_spec_prov)
+_spec_prov.loader.exec_module(providers)
+generate = providers.generate  # convenience
+
 import json
 import re
 import time
@@ -76,12 +84,35 @@ def load_config():
     if not CONFIG_PATH.exists():
         default_config = {
             "provider": "huggingface",
+            "api_key": "",
+            "expert_models": [
+                "deepseek-ai/DeepSeek-V3",
+                "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+                "zai-org/GLM-5.1",
+                "deepseek-ai/DeepSeek-V4-Pro",
+                "deepseek-ai/DeepSeek-V4-Flash",
+                "gemini-2.5-pro",
+                "gemini-2.5-flash"
+            ],
             "final_model_id": "deepseek-ai/DeepSeek-V4-Flash",
+            "sentinel_model_id": "Qwen/Qwen2.5-3B-Instruct",
             "max_tokens_per_request": 8000,
-            "temperature": 0.2
+            "temperature": 0.4,
+            "use_database_framework": False,
+            "use_local_bin_folder": False,
+            "amd_config": {"endpoint": "https://api.amd.com/v1"},
+            "gemini_model": "gemini-2.5-flash"
         }
-        json.dump(default_config, open(CONFIG_PATH, "w"), indent=4)
-    return json.load(open(CONFIG_PATH, "r"))
+        with open(CONFIG_PATH, "w") as f:
+            json.dump(default_config, f, indent=4)
+    config = json.loads(CONFIG_PATH.read_text())
+    if "gemini_model" not in config:
+        config["gemini_model"] = "gemini-2.5-flash"
+    if "expert_models" not in config:
+        config["expert_models"] = []
+    if "api_key" not in config:
+        config["api_key"] = ""
+    return config
 
 def load_env():
     if not ENV_PATH.exists():
@@ -89,15 +120,25 @@ def load_env():
         console.print("[bold white]Select AI Provider:[/bold white]")
         console.print("  [bold #ff5555]1.[/] [white]Hugging Face[/]")
         console.print("  [bold #5555ff]2.[/] [white]AMD Cloud[/]")
-        choice = input("Choice [1/2]: ").strip()
+        console.print("  [bold #e6b47c]3.[/] [white]Gemini[/]")
+        choice = input("Choice [1/2/3]: ").strip()
         
         if choice == "2":
             config = load_config()
             config["provider"] = "amd"
-            json.dump(config, open(CONFIG_PATH, "w"), indent=4)
+            with open(CONFIG_PATH, "w") as f:
+                json.dump(config, f, indent=4)
             key = input("Enter AMD_API_KEY: ").strip()
             ENV_PATH.write_text(f"AMD_API_KEY={key}\n")
             os.environ["AMD_API_KEY"] = key
+        elif choice == "3":
+            config = load_config()
+            config["provider"] = "gemini"
+            with open(CONFIG_PATH, "w") as f:
+                json.dump(config, f, indent=4)
+            key = input("Enter GEMINI_API_KEY: ").strip()
+            ENV_PATH.write_text(f"GEMINI_API_KEY={key}\n")
+            os.environ["GEMINI_API_KEY"] = key
         else:
             token = input("Enter HF_TOKEN: ").strip()
             ENV_PATH.write_text(f"HF_TOKEN={token}\n")
@@ -109,14 +150,21 @@ def load_env():
                 os.environ[k.strip()] = v.strip()
     
     config = load_config()
-    if config.get("provider") == "amd" and not os.environ.get("AMD_API_KEY"):
+    provider = config.get("provider", "huggingface")
+    if provider == "amd" and not os.environ.get("AMD_API_KEY"):
         console.print("[bold yellow]AMD provider selected but no API key found.[/bold yellow]")
         key = input("Enter AMD_API_KEY: ").strip()
         if key:
             os.environ["AMD_API_KEY"] = key
-            env_content = ENV_PATH.read_text()
-            if "AMD_API_KEY" not in env_content:
-                ENV_PATH.write_text(env_content + f"\nAMD_API_KEY={key}\n")
+            with open(ENV_PATH, "a") as f:
+                f.write(f"AMD_API_KEY={key}\n")
+    elif provider == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+        console.print("[bold yellow]Gemini provider selected but no API key found.[/bold yellow]")
+        key = input("Enter GEMINI_API_KEY: ").strip()
+        if key:
+            os.environ["GEMINI_API_KEY"] = key
+            with open(ENV_PATH, "a") as f:
+                f.write(f"GEMINI_API_KEY={key}\n")
 
 def update_markdown_view(history):
     md_content = ""
@@ -190,67 +238,18 @@ def restore_session():
         return None
 
 def ai_call(messages, config):
-    provider = config.get("provider", "huggingface")
-    if provider == "amd":
-        return amd_ai_call(messages, config)
-    else:
-        return huggingface_ai_call(messages, config)
-
-def huggingface_ai_call(messages, config):
-    from huggingface_hub import InferenceClient
-    token = os.environ.get("HF_TOKEN")
-    model = config.get("final_model_id")
     for attempt in range(3):
         try:
-            client = InferenceClient(model=model, token=token)
             with console.status("[bold cyan]Agent Cognition...", spinner="line"):
-                response = client.chat_completion(messages=messages, max_tokens=config["max_tokens_per_request"], temperature=0.2)
-            msg = response.choices[0].message
-            out = f"\u4DC2\n{msg.reasoning}\n\u4DC2\n" if hasattr(msg, 'reasoning') and msg.reasoning else ""
-            return out + (msg.content or "")
-        except Exception as e:
-            if "402" in str(e).lower() or "payment required" in str(e).lower():
+                resp = generate(messages, config)
+            if resp.startswith("Error: 402"):
                 console.print("[bold red]API Quota Exhausted. Executing Emergency Save...[/bold red]")
                 save_session_state(messages)
                 return "Error: 402"
-            time.sleep(5 * (2 ** attempt))
-    return "Error: API Timeout."
-
-def amd_ai_call(messages, config):
-    import requests as req
-    api_key = os.environ.get("AMD_API_KEY")
-    endpoint = config.get("amd_config", {}).get("endpoint", "https://api.amd.com/v1")
-    model = config.get("final_model_id")
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": model,
-        "messages": messages,
-        "max_tokens": config["max_tokens_per_request"],
-        "temperature": 0.2
-    }
-    
-    for attempt in range(3):
-        try:
-            with console.status("[bold cyan]Agent Cognition (AMD)...", spinner="line"):
-                response = req.post(f"{endpoint}/chat/completions", headers=headers, json=payload, timeout=60)
-            if response.status_code == 200:
-                data = response.json()
-                msg = data["choices"][0]["message"]
-                return msg.get("content", "")
-            elif response.status_code == 402:
-                console.print("[bold red]AMD Credits Exhausted. Executing Emergency Save...[/bold red]")
-                save_session_state(messages)
-                return "Error: 402"
-            else:
-                console.print(f"[yellow]AMD API error {response.status_code}: {response.text[:200]}[/yellow]")
+            return resp
         except Exception as e:
-            console.print(f"[yellow]AMD request failed: {e}[/yellow]")
-        time.sleep(5 * (2 ** attempt))
+            console.print(f"[yellow]AI call attempt {attempt+1} failed: {e}[/yellow]")
+            time.sleep(5 * (2 ** attempt))
     return "Error: API Timeout."
 
 BASE_PROMPT = """
@@ -290,7 +289,8 @@ def run_red_team(config, objective):
 
             console.print(f"\n[bold white]\u250c\u2500\u2500 Cycle {turn}[/bold white]")
             resp = ai_call(messages, config)
-            if "Error: 402" in resp: break
+            if resp.startswith("Error: 402"):
+                break
             messages.append({"role": "assistant", "content": resp})
             update_markdown_view(messages)
             

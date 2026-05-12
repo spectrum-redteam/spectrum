@@ -1,5 +1,13 @@
-import os
-import sys
+import sys, os
+import importlib.util
+
+# Force-load the local providers module
+_prov_path = os.path.join(os.path.dirname(__file__), "providers.py")
+_spec_prov = importlib.util.spec_from_file_location("providers", _prov_path)
+providers = importlib.util.module_from_spec(_spec_prov)
+_spec_prov.loader.exec_module(providers)
+generate = providers.generate
+
 import json
 import re
 import time
@@ -8,13 +16,11 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-
 from spectrum import tools
 from spectrum import redteamer
 
 console = Console()
 
-# THE EXACT ASCII ART PROVIDED
 BLUE_HACKER_ART = r"""[bold blue]
                                               .-+##+:.                                              
                                            .=%@@@@@@@@%=.                                           
@@ -142,11 +148,8 @@ You MUST respond with EXACTLY ONE LINE:
 
 DO NOT EXPLAIN. Just one line.
 """
-def sentinel_check(log_snippet, config):
-    """Ask the Sentinel model to check the log - supports both HF and AMD."""
-    from huggingface_hub import InferenceClient
-    import requests as req
 
+def sentinel_check(log_snippet, config):
     if not log_snippet or log_snippet.strip() == "":
         return "CLEAN"
 
@@ -154,47 +157,36 @@ def sentinel_check(log_snippet, config):
     if not has_any_traffic:
         return "CLEAN"
 
-    provider = config.get("provider", "huggingface")
-    model = config.get("sentinel_model_id", "Qwen/Qwen2.5-3B-Instruct")
-
     messages = [
         {"role": "system", "content": SENTINEL_PROMPT},
         {"role": "user", "content": f"Check this log:\n\n{log_snippet}\n\nRespond CLEAN or ATTACK: <type>."}
     ]
 
     try:
-        if provider == "amd":
-            api_key = os.environ.get("AMD_API_KEY")
-            endpoint = config.get("amd_config", {}).get("endpoint", "https://api.amd.com/v1")
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": model, "messages": messages, "max_tokens": 20, "temperature": 0.01}
-            response = req.post(f"{endpoint}/chat/completions", headers=headers, json=payload, timeout=30)
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"].strip()
-            else:
-                console.print(f"[yellow]AMD Sentinel error: {response.status_code}[/yellow]")
-                return "CLEAN"
-        else:
-            token = os.environ.get("HF_TOKEN")
-            client = InferenceClient(model=model, token=token)
-            response = client.chat_completion(messages=messages, max_tokens=20, temperature=0.01)
-            return response.choices[0].message.content.strip()
+        response = generate(messages, config, temperature=0.01, max_tokens=20)
+        first_line = response.strip().split('\n')[0]
+        if first_line in ("CLEAN", "") or first_line.startswith("CLEAN"):
+            return "CLEAN"
+        if first_line.upper().startswith("ATTACK:"):
+            return first_line
+        if "CLEAN" in response:
+            return "CLEAN"
+        return "CLEAN"
     except Exception as e:
         console.print(f"[yellow]Sentinel error: {e}[/yellow]")
         return "CLEAN"
 
 def verify_attack(log_snippet, suspicion, config):
-    """Ask DeepSeek to verify if the attack succeeded and classify it."""
     system_prompt = DEFENSE_PROMPT
     user_msg = f"Verify this suspicious request:\n\n{log_snippet}\n\nInitial suspicion: {suspicion}\n\nDid this attack succeed? Respond NORMAL or PATCH: <type>."
     
-    verify_msgs = [
+    messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_msg}
     ]
     
-    resp = redteamer.ai_call(verify_msgs, config)
-    if "Error: 402" in resp:
+    resp = generate(messages, config)
+    if resp.startswith("Error:"):
         return "ERROR"
     return resp.strip()
 
@@ -208,7 +200,6 @@ def run_blue_team(config, target_url):
     console.print(BLUE_HACKER_ART)
     console.print("[bold green]🛡️  Blue Team Sentinel Initializing...[/bold green]")
 
-    # ---- STEP 1: SETUP ----
     console.print("[bold cyan]Setting up monitoring environment...[/bold cyan]")
     
     pid_output = tools.execute_terminal(f"lsof -i :{port} -t")
@@ -254,17 +245,14 @@ def run_blue_team(config, target_url):
         try:
             cycle += 1
             
-            # Cooldown after patching
             if attack_cooldown > 0:
                 attack_cooldown -= 1
                 console.print(f"[dim]⏱️  Cycle {cycle}: COOLDOWN ({attack_cooldown} remaining)[/dim]")
                 time.sleep(2)
                 continue
 
-            # Read log
             log_output = tools.execute_terminal("tail -n 30 server.log")
             
-            # Show log snapshot
             if log_output.strip():
                 console.print(Panel(
                     Text(log_output, style="dim"),
@@ -274,7 +262,6 @@ def run_blue_team(config, target_url):
             else:
                 console.print(f"[dim]📄 Log (Cycle {cycle}): EMPTY[/dim]")
 
-            # Sentinel check - PURE AI, NO REGEX
             sentinel_result = sentinel_check(log_output, config)
             console.print(f"[dim]Sentinel AI: {sentinel_result}[/dim]")
 
@@ -287,15 +274,12 @@ def run_blue_team(config, target_url):
                 attack_type = sentinel_result.split(":", 1)[1].strip()
                 console.print(Panel(f"🚨 {attack_type}", title="⚠️  ATTACK DETECTED", border_style="red"))
                 
-                # Extract IP from log
                 ip_match = re.search(r'from (\S+)', log_output)
                 attacker_ip = ip_match.group(1) if ip_match else "127.0.0.1"
                 
-                # Block IP
                 console.print(f"[yellow]🚫 Blocking IP: {attacker_ip}[/yellow]")
                 tools.execute_terminal(f"echo '{time.ctime()} | {attacker_ip} | {attack_type}' >> blocked_ips.txt")
                 
-                # Verify with DeepSeek
                 console.print("[bold yellow]🔎 DeepSeek verifying attack...[/bold yellow]")
                 verification = verify_attack(log_output, attack_type, config)
                 console.print(f"[dim]DeepSeek: {verification}[/dim]")
@@ -303,7 +287,6 @@ def run_blue_team(config, target_url):
                 if verification.upper().startswith("PATCH:"):
                     vuln_type = verification.split(":", 1)[1].strip().lower()
                     
-                    # Map to patch types
                     vuln_map = {
                         "sqli": "sqli",
                         "sql injection": "sqli",
@@ -322,7 +305,6 @@ def run_blue_team(config, target_url):
                     res = tools.apply_patch(patch_type, "lab.py")
                     console.print(Panel(res, title="Patch Result", border_style="green"))
                     
-                    # Restart with clean log
                     tools.execute_terminal(f"kill -9 {pid}")
                     time.sleep(1)
                     tools.execute_terminal("rm -f server.log")

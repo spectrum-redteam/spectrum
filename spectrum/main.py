@@ -1,6 +1,15 @@
-import sys
+import sys, os
+import importlib.util
+
+# Load the local tui_settings module explicitly, bypassing the installed package
+_tui_path = os.path.join(os.path.dirname(__file__), "tui_settings.py")
+_spec = importlib.util.spec_from_file_location("tui_settings", _tui_path)
+tui_settings = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(tui_settings)
+
 import time
 import random
+import json
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -57,7 +66,6 @@ def main():
         time.sleep(0.06)
         
     print("\n")
-    # Universal [/] terminator to fix MarkupError
     console.print("🎉 [dim]Login successful.[/] Press [bold #58a6ff]Enter[/] to continue...", end="")
     input()
     
@@ -68,14 +76,21 @@ def main():
     
     console.print("[bold white]Select Operational Module:[/]")
     console.print("  [bold #ff5555]1.[/] [white]Red Team (Offensive)[/]")
-    console.print("  [bold #5555ff]2.[/][white] Blue Team (Defensive)[/]")
-    console.print("  [bold white]3.[/][dim]Exit[/]\n")
+    console.print("  [bold #5555ff]2.[/] [white]Blue Team (Defensive)[/]")
+    console.print("  [bold yellow]3.[/] [white]Settings[/]")
+    console.print("  [bold white]4.[/] [dim]Exit[/]\n")
     
     try:
         c = input("❯ ").strip()
-        if c == '1': redteamer.main()
-        elif c == '2': blueteamer.main()
-        else: sys.exit(0)
+        if c == '1':
+            redteamer.main()
+        elif c == '2':
+            blueteamer.main()
+        elif c == '3':
+            tui_settings.main()
+            main()
+        else:
+            sys.exit(0)
     except KeyboardInterrupt:
         sys.exit(0)
 
