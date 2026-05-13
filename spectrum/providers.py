@@ -16,9 +16,11 @@ console = Console()
 
 # Gemini is optional – only imported when actually needed
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 # ----------------------------------------------------------------------
 # Helper: load config from the standard path
@@ -37,8 +39,8 @@ def _load_config():
 def _init_gemini(config):
     if genai is None:
         raise RuntimeError(
-            "google-generativeai is not installed. "
-            "Run: pip3 install --break-system-packages google-generativeai"
+            "google-genai is not installed. "
+            "Run: pip install google-genai"
         )
     api_key = config.get("api_key") or os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -46,9 +48,8 @@ def _init_gemini(config):
             "Gemini provider selected but no api_key set. "
             "Use Settings to add your key."
         )
-    genai.configure(api_key=api_key)
-    model_name = config.get("gemini_model", "gemini-2.5-flash")
-    return genai.GenerativeModel(model_name)
+    client = genai.Client(api_key=api_key)
+    return client
 
 # ----------------------------------------------------------------------
 # Core call – all providers
@@ -90,46 +91,66 @@ def generate(
 
     # ---------- Gemini ----------
     if provider == "gemini":
-        model = _init_gemini(config)
-        # Build Gemini contents list (system prompt → prepended to first user turn)
-        contents = []
-        system_content = []
+        client = _init_gemini(config)
+        model_name = config.get("gemini_model", "gemini-2.5-flash")
+
+        # Build prompt from messages
+        system_parts = []
+        conversation = []
+
         for msg in messages:
             role = msg["role"]
             content = msg["content"]
             if role == "system":
-                system_content.append(content)
+                system_parts.append(content)
             elif role == "user":
-                parts = []
-                if system_content:
-                    parts.append("[System]\n" + "\n".join(system_content))
-                    system_content.clear()
-                parts.append(content)
-                contents.append({"role": "user", "parts": ["\n".join(parts)]})
+                text = content
+                if system_parts:
+                    text = "[System]\n" + "\n".join(system_parts) + "\n\n" + text
+                    system_parts.clear()
+                conversation.append(types.Content(
+                    role="user",
+                    parts=[types.Part(text=text)]
+                ))
             elif role == "assistant":
-                contents.append({"role": "model", "parts": [content]})
-        # If there are still system messages left, prepend to the last user turn or create one
-        if system_content:
-            if contents and contents[-1]["role"] == "user":
-                parts = contents[-1]["parts"]
-                parts[0] = "[System]\n" + "\n".join(system_content) + "\n\n" + parts[0]
+                conversation.append(types.Content(
+                    role="model",
+                    parts=[types.Part(text=content)]
+                ))
+
+        # Handle any remaining system messages
+        if system_parts:
+            if conversation and conversation[-1].role == "user":
+                existing = conversation[-1].parts[0].text
+                conversation[-1] = types.Content(
+                    role="user",
+                    parts=[types.Part(text="[System]\n" + "\n".join(system_parts) + "\n\n" + existing)]
+                )
             else:
-                contents.append({"role": "user", "parts": ["[System]\n" + "\n".join(system_content)]})
+                conversation.append(types.Content(
+                    role="user",
+                    parts=[types.Part(text="[System]\n" + "\n".join(system_parts))]
+                ))
 
         for attempt in range(retries):
             try:
                 with console.status("[bold cyan]Agent Cognition (Gemini)...", spinner="line"):
-                    response = model.generate_content(
-                        contents,
-                        generation_config={
-                            "temperature": temp,
-                            "max_output_tokens": mtokens,
-                        },
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=conversation,
+                        config=types.GenerateContentConfig(
+                            temperature=temp,
+                            max_output_tokens=mtokens,
+                        ),
                     )
                 return response.text
             except Exception as e:
-                if "quota" in str(e).lower() or "429" in str(e):
-                    console.print("[bold red]Gemini quota exhausted. Saving state?[/bold red]")
+                err_str = str(e).lower()
+                if "quota" in err_str or "429" in err_str:
+                    console.print("[bold red]Gemini quota exhausted.[/bold red]")
+                elif "api_key" in err_str or "invalid" in err_str:
+                    return "Error: Invalid Gemini API Key"
+                console.print(f"[yellow]Gemini attempt {attempt+1} failed: {e}[/yellow]")
                 time.sleep(5 * (2 ** attempt))
         return "Error: Gemini API Timeout"
 
@@ -147,7 +168,6 @@ def generate(
                         temperature=temp,
                     )
                 msg = response.choices[0].message
-                # Include reasoning if available (hidden in special chars as before)
                 reasoning = getattr(msg, "reasoning", None)
                 if reasoning:
                     return f"\u4DC2\n{reasoning}\n\u4DC2\n" + (msg.content or "")
