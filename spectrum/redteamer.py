@@ -17,6 +17,12 @@ from rich.console import Console
 from rich.panel import Panel
 from spectrum import tools
 
+# Audit trail integration
+_audit_path = os.path.join(os.path.dirname(__file__), "audit.py")
+_spec_audit = importlib.util.spec_from_file_location("audit", _audit_path)
+audit_mod = importlib.util.module_from_spec(_spec_audit)
+_spec_audit.loader.exec_module(audit_mod)
+
 console = Console()
 BASE_DIR = Path(__file__).resolve().parent
 TUTORIALS_DIR = BASE_DIR / "tutorials"
@@ -266,7 +272,15 @@ You are an advanced, fully autonomous offensive security agent.
 2. End with exactly ONE JSON block: {"tool": "execute_terminal", "args": {"cmd": "string"}}
 """
 
-def run_red_team(config, objective):
+def run_red_team(config, objective, api_key=None):
+    # Enterprise auth check
+    if api_key:
+        access = audit_mod.verify_access(api_key, objective)
+        if not access["allowed"]:
+            console.print(f"[bold red][ACCESS DENIED] {access['reason']}[/bold red]")
+            return
+        console.print(f"[bold green][ACCESS GRANTED] {access['reason']} User: {access.get('user', 'unknown')}[/bold green]")
+    
     restored = restore_session()
     if restored:
         messages = restored
@@ -274,7 +288,7 @@ def run_red_team(config, objective):
     else:
         if THOUGHTS_PATH.exists(): os.remove(THOUGHTS_PATH)
         system_prompt = BASE_PROMPT + f"\n\n# RECENT ACTION TRAIL & PLAN:\n{get_action_trail_context()}\n" + get_tutorial_knowledge()
-        messages =[{"role": "system", "content": system_prompt}, {"role": "user", "content": f"OBJECTIVE: {objective}"}]
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": f"OBJECTIVE: {objective}"}]
         
     SESSION_MD.write_text("", encoding="utf-8")
     subprocess.Popen(["python3", str(BASE_DIR / "viewer.py")], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
@@ -312,6 +326,17 @@ def run_red_team(config, objective):
                 
                 res = str(tools.route_tool(t_name, t_args, config))
                 console.print(Panel(res[:3000], title="Standard Output", border_style="green"))
+
+                # Log to audit trail
+                if api_key:
+                    audit_mod.log_action(
+                        api_key=api_key,
+                        action=f"{t_name}: {str(raw_cmd)[:100]}",
+                        target=objective,
+                        result=res[:200],
+                        mode="red",
+                        risk_score=0.7
+                    )
                 
                 messages.append({"role": "user", "content": f"Result: {res}"})
                 update_markdown_view(messages)
@@ -337,8 +362,16 @@ def run_red_team(config, objective):
 def main():
     load_env()
     config = load_config()
+    
+    # Enterprise auth
+    console.print("[bold white]Enter API Key (or press Enter for admin bypass):[/bold white]")
+    api_key = input("API Key > ").strip()
+    if not api_key:
+        api_key = audit_mod.ADMIN_KEY
+        console.print("[bold yellow]Using admin bypass key[/bold yellow]")
+
     obj = input("Target / Objective \u276f ").strip()
-    if obj: run_red_team(config, obj)
+    if obj: run_red_team(config, obj, api_key=api_key)
 
 if __name__ == "__main__":
     main()

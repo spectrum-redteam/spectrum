@@ -1,9 +1,4 @@
-"""
-spectrum/providers.py
-=====================
-Unified interface for HuggingFace, Gemini, and AMD backends.
-All LLM calls in Spectrum go through here.
-"""
+
 import os
 import re
 import time
@@ -21,6 +16,48 @@ try:
 except ImportError:
     genai = None
     types = None
+
+# ----------------------------------------------------------------------
+# LobsterTrap proxy integration
+# ----------------------------------------------------------------------
+LOBSTERTRAP_URL = "http://localhost:8080/v1"
+LOBSTERTRAP_DASHBOARD = "http://localhost:8080/_lobstertrap/"
+
+def _lobstertrap_available():
+    """Check if LobsterTrap proxy is running."""
+    try:
+        resp = req.get(LOBSTERTRAP_DASHBOARD, timeout=1)
+        return resp.status_code == 200
+    except:
+        return False
+
+def _call_via_lobstertrap(messages, model, temperature, max_tokens):
+    """
+    Send request through LobsterTrap proxy using OpenAI-compatible API.
+    LobsterTrap inspects and enforces policy before forwarding.
+    """
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    try:
+        resp = req.post(
+            f"{LOBSTERTRAP_URL}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120,
+        )
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"]
+        elif resp.status_code == 403:
+            return f"Error: LobsterTrap DENIED — {resp.json().get('message', 'Policy violation')}"
+        else:
+            return None
+    except Exception as e:
+        return None
 
 # ----------------------------------------------------------------------
 # Helper: load config from the standard path
@@ -63,25 +100,6 @@ def generate(
     max_tokens=None,
     retries=3,
 ):
-    """
-    Send a chat conversation and return the assistant's text.
-
-    Parameters
-    ----------
-    messages : list of dict
-        Each dict with 'role' ('system', 'user', 'assistant') and 'content'.
-    config : dict or None
-        Loaded config.json dictionary. If None, loads automatically.
-    model_id : str or None
-        Override the final model ID. For Gemini this is ignored.
-    temperature, max_tokens : override config values.
-    retries : int
-        Number of attempts on transient errors.
-
-    Returns
-    -------
-    str – the assistant response, or an error string starting with "Error:".
-    """
     if config is None:
         config = _load_config()
 
@@ -89,12 +107,24 @@ def generate(
     temp = temperature if temperature is not None else config.get("temperature", 0.4)
     mtokens = max_tokens if max_tokens is not None else config.get("max_tokens_per_request", 8000)
 
+    # ---------- LobsterTrap proxy check ----------
+    if _lobstertrap_available():
+        console.print("[bold green][LobsterTrap] Active — inspecting prompt...[/bold green]")
+        lt_model = model_id or config.get("final_model_id", "gpt-3.5-turbo")
+        lt_result = _call_via_lobstertrap(messages, lt_model, temp, mtokens)
+        if lt_result is not None:
+            if lt_result.startswith("Error: LobsterTrap DENIED"):
+                console.print(f"[bold red]{lt_result}[/bold red]")
+                return lt_result
+            return lt_result
+        else:
+            console.print("[yellow][LobsterTrap] Proxy failed — falling back to direct provider[/yellow]")
+
     # ---------- Gemini ----------
     if provider == "gemini":
         client = _init_gemini(config)
         model_name = config.get("gemini_model", "gemini-2.5-flash")
 
-        # Build prompt from messages
         system_parts = []
         conversation = []
 
@@ -118,7 +148,6 @@ def generate(
                     parts=[types.Part(text=content)]
                 ))
 
-        # Handle any remaining system messages
         if system_parts:
             if conversation and conversation[-1].role == "user":
                 existing = conversation[-1].parts[0].text
