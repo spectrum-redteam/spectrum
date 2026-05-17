@@ -1,4 +1,7 @@
 requests
 rich
 huggingface_hub
-Pyxtermjs
+pyxtermjs
+flask
+flask-cors
+google-genai
