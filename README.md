@@ -17,71 +17,107 @@
     <img alt="PyPI Downloads" src="https://img.shields.io/pypi/dm/spectrum-security?style=for-the-badge&logo=pypi&labelColor=000000&color=00FF88" />
   </a>
 </p>
-Spectrum is an agentic security tool created by Roland Poon and William Jiang. It runs on HuggingFace Inference API or AMD Cloud. 
 
-It is made with Python and runs on most systems including macOS and Windows, and Debian or Ubuntu distributions including Kali Linux (Debian).  The tool is lightweight and can be configured to use a local SQLITE database and also local cybersecurity tools such as Tshark, Wireshark and John The Ripper or similar. This also comes prepackaged with wordlists.
+Spectrum is an agentic cybersecurity platform created by **Roland Poon** and **William Jiang**. It runs a fully autonomous Red Team agent that attacks and a Blue Team agent that defends — simultaneously — powered by large language models. Every action is inspected in real time by **LobsterTrap**, Spectrum's built-in guardrail engine.
 
-![macOS](https://img.shields.io/badge/Platform-macOS-black)![Windows](https://img.shields.io/badge/Platform-Windows-blue?logo=microsoft)![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=Ubuntu&logoColor=white)![Linux](https://shields.io/badge/Platform-Linux-blue?logo=linux)![Debian](https://img.shields.io/badge/debian-red?style=for-the-badge&logo=debian&logoColor=orange&color=darkred)
+Spectrum supports **Google Gemini**, **HuggingFace Inference API**, and **AMD Cloud** as LLM providers. It is built with Python and runs on most systems including macOS, Windows, and Debian or Ubuntu distributions including Kali Linux. The tool is lightweight and can be configured to use a local SQLite database and local cybersecurity tools such as Tshark, Wireshark, and John the Ripper. Wordlists are included.
+
+![macOS](https://img.shields.io/badge/Platform-macOS-black)
+![Windows](https://img.shields.io/badge/Platform-Windows-blue?logo=microsoft)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=Ubuntu&logoColor=white)
+![Linux](https://shields.io/badge/Platform-Linux-blue?logo=linux)
+![Debian](https://img.shields.io/badge/debian-red?style=for-the-badge&logo=debian&logoColor=orange&color=darkred)
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
 
+---
+
 ## Quickstart
-Since Spectrum runs on Python you should have Python 3.0 and pip or pip3. I have created install scripts for as many platforms I can think of.
-#Linux
-**Ubuntu/Debian**
-This is an install script hosted on Github Pages.
+
+Spectrum requires Python 3.10 or higher.
+
+**Linux — Ubuntu / Debian**
 ```bash
-curl -fSSL https://spectrum-redteamer.github.io/spectrum-apt/install.sh
+curl -fsSL https://spectrum-redteamer.github.io/spectrum-apt/install.sh
 ```
 
-**AUR(Arch Linux)**
+**AUR (Arch Linux)**
 ```bash
 yay -S spectrum
 ```
-#General
-**Python package**
+
+**PyPI**
 ```bash
 pip install spectrum-security
-    #or
+# or
 pip3 install spectrum-security
 ```
-**UV(Ultraviolet)**
+
+**UV**
 ```bash
 uvx spectrum-security
 ```
-#macOS
-**Homebrew**
+
+**macOS Homebrew**
 ```bash
 brew install spectrum-security
 ```
+
 **Portable Release**
 ```bash
 ./spectrum-darwin-arm64.tar.gz
 ```
-#Windows
-**Scoop**
+
+**Windows Scoop**
 ```powershell
 scoop bucket add spectrum-redteam https://github.com/spectrum-redteam/scoop-spectrum
 scoop install spectrum
 ```
+
 **Chocolatey**
 ```powershell
 choco install spectrum-security
-#Not yet ready for use
+# Not yet ready for use
 ```
+
+---
+
+## Installation from Source
+
+```bash
+git clone https://github.com/spectrum-redteam/spectrum.git
+cd spectrum
+python3 -m venv venv
+source venv/bin/activate        # macOS / Linux
+venv\Scripts\activate           # Windows
+pip install -r requirements.txt
+```
+
+On macOS with Homebrew Python you may need:
+```bash
+pip install --break-system-packages -r requirements.txt
+```
+
+---
+
 ## Configuration
-Most configuration can be done in the config.json file. For example you can change the core model to GLM 5.1:
-```python
+
+Most configuration can be done in `config.json`. For example, to use Gemini 2.5 Flash:
+
+```json
 {
-    "provider": "huggingface",
+    "provider": "gemini",
     "expert_models": [
         "deepseek-ai/DeepSeek-V3",
         "Qwen/Qwen3-Coder-480B-A35B-Instruct",
         "zai-org/GLM-5.1",
         "deepseek-ai/DeepSeek-V4-Pro",
-        "deepseek-ai/DeepSeek-V4-Flash"
+        "deepseek-ai/DeepSeek-V4-Flash",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash"
     ],
-    "final_model_id": "zai-org/GLM-5.1",
-    "sentinel_model_id": "meta-llama/Llama-3.1-8B-Instruct",
+    "final_model_id": "deepseek-ai/DeepSeek-V4-Flash",
+    "sentinel_model_id": "Qwen/Qwen2.5-3B-Instruct",
+    "gemini_model": "gemini-2.5-flash",
     "max_tokens_per_request": 8000,
     "temperature": 0.4,
     "use_database_framework": false,
@@ -91,99 +127,135 @@ Most configuration can be done in the config.json file. For example you can chan
     }
 }
 ```
-And then you can change whether you want to connect through HuggingFace inference or AMD cloud. 
 
-Upon setup there is a prompt asking you for your HuggingFace Access Token.
-You can make one in huggingface.co after makeing an account. 
+### API Keys
 
-You can configure the different settings and you can turn local SQlite on and off, and you can also change the local bin folder use. 
+On first run, Spectrum prompts for your provider API key. You can also set it manually:
 
-You can always download or write your own skills and import them into the tutorials folder and the AI will follow them.
-## Documentation
+```bash
+# Google Gemini
+echo "GEMINI_API_KEY=your_key_here" > .env
+
+# HuggingFace
+echo "HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx" > .env
+
+# AMD Cloud
+echo "AMD_API_KEY=your_key_here" > .env
+```
+
+You can always download or write your own skills and import them into the `tutorials/` folder — the AI will follow them as operational directives.
+
+---
+
+## Running Spectrum
+
+**Start the vulnerable lab target (optional but recommended):**
+```bash
+python3 lab.py
+```
+This starts the intentionally vulnerable Flask app at `http://127.0.0.1:4999`.
+
+**Launch Spectrum:**
+```bash
+python3 main.py
+```
+
+You will see the Spectrum banner. Press **Enter** to continue.
+
+```
+Select Operational Module:
+  1. Red Team (Offensive)
+  2. Blue Team (Defensive)
+  3. Exit
+```
+
+**Red Team Mode** — Enter a target and objective. The agent plans and executes attacks autonomously using tools like nmap, John the Ripper, and curl.
+
+**Blue Team Mode** — Enter the URL to defend. Sentinel monitors logs every 2 seconds. When an attack is detected, the main model classifies it, patches the vulnerable code, and restarts the server automatically.
+
+During any session, press `Ctrl+C` then:
+- `s` — steer the agent
+- `p` — pause and save
+- `Enter` — resume
+
+---
+
 ## Features
 
-- **Red Team Agent**  Automated pentesting with Thought-Action-Observation loops. Scans targets, identifies vulnerabilities, writes custom exploits, and pivots through systems.
-- **Blue Team Agent**  Real-time log monitoring with autonomous patching. Detects attacks, classifies threats, and rewrites vulnerable source code live.
-- **Modular Tool System** Extensible Python architecture with terminal execution, HTTP interaction, and self-preservation safeguards.
-- **Knowledge Base (RAG)**  Baked SQLite database of verified exploits and payloads for retrieval-augmented generation. (Must be configured)
-- **Purple Teaming**  Dual-team architecture creates a continuous feedback loop where every intrusion hardens the system permanently.
-- **Emergency** An emergency report is generated upon a server error or something else, so your progress is not lost.
-- **Thinking** The agent uses a custom token delimiter (`䷂`) to separate its internal reasoning from its external communication. This allows the AI to "think out loud" about its strategy without cluttering the operator's log.
+- **Red Team Agent** — Automated pentesting with Thought-Action-Observation loops. Scans targets, identifies vulnerabilities, writes custom exploits, and pivots through systems.
+- **Blue Team Agent** — Real-time log monitoring with autonomous patching. Uses a two-model pipeline: a lightweight Sentinel model watches logs continuously, and when an attack is detected, the main model classifies the threat and rewrites the vulnerable source code live. Mean patch time under 5 seconds.
+- **LobsterTrap Guardrail Engine** — Every prompt generated by either agent is inspected before execution. Enforces 18 configurable rules covering data exfiltration, prompt injection, sensitive path access, and credential harvesting. Each decision — DENY, REVIEW, or ALLOW — is logged with a risk score. Live dashboard at `localhost:8080`.
+- **Audit Trail** — Full structured logging of every agent action with timestamp, agent ID, action type, risk score, and outcome. Exportable as JSON, Markdown, or PDF.
+- **Drift Analyser** — File integrity monitoring that detects hallucination, scope creep, and goal drift automatically. Compares tracked files against a SHA-256 baseline. Changed files are classified as expected, flagged, or auto-reverted.
+- **Attack Dashboard** — Real-time visual interface (`spectrum_dashboard.html`) showing the full attack timeline, network map, risk scores per vector, LobsterTrap intercept feed, Blue Team patch log, and compliance control status.
+- **Compliance Reporting** — SOC 2 Type II and HIPAA Security Rule (45 CFR §164.312) controls mapped and tracked live. Scores update as vulnerabilities are discovered and patched.
+- **Demo Site** — Public-facing hacking challenge (`demo_site.html` + `demo_server.py`). Users attack SpecBot, a deliberately vulnerable AI chatbot. Every attack is scored by LobsterTrap in real time and ranked on a live leaderboard.
+- **Multimodal Injection Detection** — Image-based prompt injection detection. Analyses uploaded images for embedded adversarial instructions before they reach the language model.
+- **Knowledge Base (RAG)** — SQLite database (`kb.sqlite3`) of verified exploits and payloads for retrieval-augmented generation. Enable with `"use_database_framework": true` in `config.json`.
+- **Purple Teaming** — Dual-team architecture creates a continuous feedback loop where every intrusion permanently hardens the system.
+- **Emergency Save** — On server error or API quota exhaustion (402), the agent saves full session state to `operation_state_recovery.json` and resumes automatically on restart.
+- **Custom Skills** — Drop `.md` or `.txt` playbooks into `tutorials/`. Both agents load them at startup as operational directives.
+- **Thinking Delimiter** — The agent uses a custom token delimiter (`䷂`) to separate internal reasoning from external output, letting the AI think through strategy without cluttering the operator log.
 
-The LLM has full access to the terminal, and it can be configured to use tools stored in a local bin folder for specialised workflows. 
-The agent uses a custom token delimiter (`䷂`) to separate its internal reasoning from its external communication. This allows the AI to "think out loud" about its strategy without cluttering the operator's log.
+---
 
+## File Architecture
 
-**File Architecture**
-```json
-spectrum/
-L main.py
-L blueteamer.py
-L redteamer.py
-L config.json
-L __init__.py
-L viewer.py
-L modules/
-    L hash_util.py
-    L port_scanner.py
-L wordlists/
-    L common.txt
-L tutorials/
-L tools.py
 ```
-main.py: Core file that handles the intro and config management
-blueteamer.py: File that handles the blueteamer agent.
-redteamer.py: File that handles the redteamer agent.
-config.json: File that handles configuration
-viewer.py: Renderer for a better UI.
-tools.py: The core file that handles the tool use and how to AI calls commands.
+spectrum/
+├── main.py                        # Entry point, mode selector
+├── redteamer.py                   # Offensive agent logic
+├── blueteamer.py                  # Defensive agent (Sentinel + patcher)
+├── tools.py                       # Tool implementations (shell, HTTP, file I/O, patch engine)
+├── providers.py                   # Unified LLM provider (Gemini / HuggingFace / AMD)
+├── audit.py                       # Audit trail and access control
+├── lab.py                         # Intentionally vulnerable Flask app (test target)
+├── config.json                    # Model IDs and provider settings
+├── requirements.txt               # Python dependencies
+├── demo_server.py                 # Demo site backend (chatbot + scoring + leaderboard)
+├── demo_site.html                 # Public hacking challenge site
+├── spectrum_dashboard.html        # Real-time attack dashboard
+├── viewer.py                      # Renderer for a better UI
+├── __init__.py
+├── tutorials/                     # Custom skill playbooks
+├── modules/
+│   ├── hash_util.py
+│   └── port_scanner.py
+├── wordlists/
+│   └── common.txt
+├── blocked_ips.txt                # IPs blocked during Blue Team sessions
+├── attacks.log                    # Record of detected attacks
+├── server.log                     # Flask output (created at runtime)
+├── audit_log.json                 # Full structured audit trail
+├── session.md                     # Live session log
+├── thoughts.json                  # Agent reasoning trail
+└── operation_state_recovery.json  # Emergency save state
+```
 
-### How it works
-This project is controlled by a few files. 
+---
 
-#System
-There is a Python extractor logic to extract tool calls from the AI response. Here is an example logic block.
+## How It Works
+
+### Provider Abstraction
+
 ```python
 def ai_call(messages, config):
     provider = config.get("provider", "huggingface")
-    if provider == "amd":
+    if provider == "gemini":
+        return gemini_ai_call(messages, config)
+    elif provider == "amd":
         return amd_ai_call(messages, config)
     else:
         return huggingface_ai_call(messages, config)
-
-def huggingface_ai_call(messages, config):
-    from huggingface_hub import InferenceClient
-    token = os.environ.get("HF_TOKEN")
-    model = config.get("final_model_id")
-    for attempt in range(3):
-        try:
-            client = InferenceClient(model=model, token=token)
-            with console.status("[bold cyan]Agent Cognition...", spinner="line"):
-                response = client.chat_completion(messages=messages, max_tokens=config["max_tokens_per_request"], temperature=0.2)
-            msg = response.choices[0].message
-            out = f"\u4DC2\n{msg.reasoning}\n\u4DC2\n" if hasattr(msg, 'reasoning') and msg.reasoning else ""
-            return out + (msg.content or "")
-        except Exception as e:
-            if "402" in str(e).lower() or "payment required" in str(e).lower():
-                console.print("[bold red]API Quota Exhausted. Executing Emergency Save...[/bold red]")
-                save_session_state(messages)
-                return "Error: 402"
-            time.sleep(5 * (2 ** attempt))
-    return "Error: API Timeout."
 ```
-#blueteam
-Blueteamer works by first finding the process ID of the server and begins to watch for traffic. This is only tested on a UNIX based system and may not work on Windows. When the traffic is captured every 2 seconds it is analysed by a tiny model which is Qwen 2.5 3B. This means that even for thousands of requests the inference would only cost pennies but still get a model that is reasonably smart enough to watch for suspicious attack attempts.
- 
- Then if the small "Sentinel" model finds an error, the IP address is flagged and blocked it is immediately sent to the larger, smarter DeepSeek V4 Flash to analyse the attempt and patch the code. There is a function to pre-index your source code so in a good scenario a critical vulnerability could be patched and resolved in under 5 seconds. This is also shown in the demo video.
 
- 
- This is an example of the Sentinel logic.
- ```python
+### Blue Team — Sentinel
+
+The Sentinel model watches the server log every 2 seconds. It is intentionally lightweight (Qwen 2.5 3B) so even thousands of requests cost pennies.
+
+```python
 def sentinel_check(log_snippet, config):
     """Ask the Sentinel model to check the log - supports both HF and AMD."""
-    from huggingface_hub import InferenceClient
-    import requests as req
-
     if not log_snippet or log_snippet.strip() == "":
         return "CLEAN"
 
@@ -191,55 +263,43 @@ def sentinel_check(log_snippet, config):
     if not has_any_traffic:
         return "CLEAN"
 
-    provider = config.get("provider", "huggingface")
-    model = config.get("sentinel_model_id", "Qwen/Qwen2.5-3B-Instruct")
-
     messages = [
         {"role": "system", "content": SENTINEL_PROMPT},
         {"role": "user", "content": f"Check this log:\n\n{log_snippet}\n\nRespond CLEAN or ATTACK: <type>."}
     ]
- ```
- This is the DeepSeek call logic.
+```
 
- ```python
-    def verify_attack(log_snippet, suspicion, config):
-    """Ask DeepSeek to verify if the attack succeeded and classify it."""
-    system_prompt = DEFENSE_PROMPT
+When Sentinel fires, the main model verifies and patches:
+
+```python
+def verify_attack(log_snippet, suspicion, config):
+    """Ask the main model to verify if the attack succeeded and patch the code."""
     user_msg = f"Verify this suspicious request:\n\n{log_snippet}\n\nInitial suspicion: {suspicion}\n\nDid this attack succeed? Respond NORMAL or PATCH: <type>."
-    
+
     verify_msgs = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": DEFENSE_PROMPT},
         {"role": "user", "content": user_msg}
     ]
-    
+
     resp = redteamer.ai_call(verify_msgs, config)
     if "Error: 402" in resp:
         return "ERROR"
     return resp.strip()
-
- ```
-
-#redteam
-Redteamer works by using system commands like John The Ripper, nmap and then use the powerful DeepSeek V4 Flash/Pro in order to try to run payloads and commands. It can efficiently use cURL commands and other tools to write scripts and generate payloads to use on sites.
-
-An example of its successes can be found in the demo video.
-
-This is how it handles the temporary files and it uses emergency file export system, so when there is a server error or 402 your progress is not gone and can be backed up.
-
-```python
-console = Console()
-BASE_DIR = Path(__file__).resolve().parent
-TUTORIALS_DIR = BASE_DIR / "tutorials"
-ENV_PATH = BASE_DIR / ".env"
-CONFIG_PATH = BASE_DIR / "config.json"
-SESSION_MD = BASE_DIR / "session.md"
-DUMP_PATH = BASE_DIR / "operation_state_recovery.json"
-THOUGHTS_PATH = BASE_DIR / "thoughts.json"
-#code found in redteamer
 ```
-This project also supports external Skills imports through the tutorials directory.
-```python
 
+### Red Team — Emergency Save
+
+```python
+BASE_DIR      = Path(__file__).resolve().parent
+TUTORIALS_DIR = BASE_DIR / "tutorials"
+SESSION_MD    = BASE_DIR / "session.md"
+DUMP_PATH     = BASE_DIR / "operation_state_recovery.json"
+THOUGHTS_PATH = BASE_DIR / "thoughts.json"
+```
+
+### Custom Skills
+
+```python
 def get_tutorial_knowledge():
     knowledge = "\n# ABSOLUTE SYSTEM DIRECTIVES (MUST BE FOLLOWED STRICTLY):\n"
     if TUTORIALS_DIR.exists():
@@ -250,213 +310,49 @@ def get_tutorial_knowledge():
             try: knowledge += f"## Reference: {file.name}\n{file.read_text(encoding='utf-8', errors='ignore')}\n\n"
             except: pass
     return knowledge
-    #code found from redteamer
 ```
+
+---
+
 ## Troubleshooting
-If Spectrum fails to launch, first verify your Python version is 3.10 or higher with python3 --version. The most common issue is the binary not being found on PATH after installation. Run which spectrum to confirm the install location, and if it returns nothing, add 
+
+**Python version error** — Verify with `python3 --version`. Spectrum requires 3.10 or higher.
+
+**Binary not found after install** — Add Python to PATH:
 ```bash
 export PATH="$HOME/Library/Python/3.11/bin:$PATH"
 ```
- to your shell configuration file. On macOS, Homebrew may place the binary in a non-standard location; check /opt/homebrew/bin or your custom Homebrew prefix.
- 
-  If you encounter an externally-managed-environment error on macOS, either use a virtual environment with 
-  ```python
-  python3 -m venv venv && source venv/bin/activate
-  ```
-   or pass the --break-system-packages flag to pip.
-  
-   For Windows Scoop users, ensure the bucket was added before installing with scoop bucket add spectrum-redteam https://github.com/spectrum-redteam/scoop-spectrum. If the Red Team agent fails to connect to a target, verify your HuggingFace API token is set with export HF_TOKEN="your_token". 
-   
-   When the Blue Team Sentinel fails to start, check that the target Flask application is running and that server.log is being written to the expected location. 
-   
-   For cached version issues where changes do not appear after an update, purge the pip cache with 
-   ```python
-   pip cache purge
-   ```
-   and reinstall with 
-   ```python
-   pip install spectrum-security --upgrade --no-cache-dir --force-reinstall
-   ```
-   
-   If you hit a 402 Payment Required error, the agent will save its state to operation_state_recovery.json and resume automatically on restart. Any other issues can be reported at the GitHub repository.
 
-=======
-# Spectrum – Red/Blue Team AI Framework
+**externally-managed-environment error on macOS** — Use a virtual environment or pass `--break-system-packages`:
+```bash
+python3 -m venv venv && source venv/bin/activate
+```
 
-A dual‑mode autonomous security platform.  
-Run as **Red Team** to attack a target, or as **Blue Team** to monitor, detect intrusions and hot‑patch vulnerabilities.  
-Powered by Hugging Face (or AMD Cloud) models.
+**ModuleNotFoundError** — Run `pip install -r requirements.txt` again.
 
----
+**API Quota Exhausted (402)** — The agent saves state automatically to `operation_state_recovery.json`. Wait a few minutes or switch models in `config.json`, then restart to resume.
 
-## Prerequisites
+**Blue Team Sentinel not detecting attacks** — Ensure `lab.py` is running and `server.log` is being written. Blue Team starts the server automatically for `lab.py`.
 
-- Python 3.10 or newer
-- pip
-- A Hugging Face account ([hf.co](https://hf.co)) and an API token
-- Git (optional – you can also download the ZIP)
+**LobsterTrap dashboard not loading** — Ensure `demo_server.py` is running:
+```bash
+python3 demo_server.py
+```
+Dashboard is at `http://localhost:5050`.
+
+**Cached version issues** — Purge and reinstall:
+```bash
+pip cache purge
+pip install spectrum-security --upgrade --no-cache-dir --force-reinstall
+```
+
+**Windows Scoop** — Ensure the bucket was added before installing:
+```powershell
+scoop bucket add spectrum-redteam https://github.com/spectrum-redteam/scoop-spectrum
+```
+
+**Terminal output broken** — Run `main.py` in a standard terminal. Rich formatting requires a proper TTY.
 
 ---
 
-## Clone the project
-
-~~~bash
-git clone https://github.com/yourusername/spectrum.git
-cd spectrum
-~~~
-
-If you downloaded a ZIP, extract it and open a terminal inside the extracted folder.
-
----
-
-## Install dependencies
-
-Create and activate a virtual environment (recommended):
-
-~~~bash
-python3 -m venv venv
-source venv/bin/activate       # macOS / Linux
-venv\Scripts\activate          # Windows
-~~~
-
-Install the required packages:
-
-~~~bash
-pip install -r requirements.txt
-~~~
-
-On macOS with Homebrew Python you may need:
-
-~~~bash
-pip install --break-system-packages -r requirements.txt
-~~~
-
----
-
-## Configuration
-
-### API Provider & Token
-
-On the first run, Spectrum asks which provider you want to use:
-
-1. **Hugging Face** – you will be prompted for your `HF_TOKEN`.
-2. **AMD Cloud** – you will be prompted for your `AMD_API_KEY`.
-3. **Google Gemini**- Experimental, prompted for API key.
-
-The token is saved in a `.env` file.  
-You can also create that file manually:
-
-~~~bash
-echo "HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx" > .env
-~~~
-
-(Replace `hf_xxxxxxxxxxxxxxxxxxxx` with your actual token.)
-
-### Model selection (`config.json`)
-
-The default models work out of the box.  
-You can change `final_model_id` (the main agent) and `sentinel_model_id` (the lightweight Blue Team watcher) inside `config.json`.
-
-Example excerpt:
-
-~~~json
-{
-    "final_model_id": "deepseek-ai/DeepSeek-V4-Flash",
-    "sentinel_model_id": "Qwen/Qwen2.5-3B-Instruct"
-}
-~~~
-
----
-
-## Run a vulnerable target (optional)
-
-The project includes a deliberately vulnerable Flask application (`lab.py`).  
-Start it in a separate terminal to give the agents something to attack/defend:
-
-~~~bash
-python3 lab.py
-~~~
-
-It listens on `http://127.0.0.1:4999` (or the port printed in the terminal).
-
----
-
-## Launch Spectrum
-
-~~~bash
-python3 main.py
-~~~
-
-You will see the Spectrum banner. Press **Enter** to continue.
-
-### Choose your mode
-
-~~~text
-Select Operational Module:
-  1. Red Team (Offensive)
-  2. Blue Team (Defensive)
-  3. Exit
-~~~
-
----
-
-### Red Team Mode
-
-1. Enter a target / objective, for example:  
-   `Find the hidden flag on http://127.0.0.1:4999`
-2. The agent will plan, execute terminal commands, write scripts, and attempt to breach the target.
-3. **Ctrl+C** to pause, then:
-   - `s` – steer the agent (give an instruction)
-   - `p` – pause and save the session
-   - `Enter` – resume
-
----
-
-### Blue Team Mode
-
-1. Enter the URL to defend, for example:  
-   `http://127.0.0.1:4999`
-2. The Blue Team will:
-   - Kill the existing server (if any) and restart it with logging enabled.
-   - Start a Sentinel (small AI model) that watches the log file every few seconds.
-   - When an attack is detected:
-     - Record the attacker IP (in `blocked_ips.txt`).
-     - Ask the main model to classify the attack.
-     - Automatically patch the vulnerable code (SQLi, command injection, SSTI, etc.).
-     - Restart the server with a fresh log.
-3. **Ctrl+C** to pause, same steering options as Red Team.
-
----
-
-## File structure (key files)
-
-~~~
-spectrum/
-├── main.py               # Entry point, mode selector
-├── redteamer.py          # Offensive agent logic
-├── blueteamer.py         # Defensive agent (Sentinel + patcher)
-├── tools.py              # Tool implementations (shell, HTTP, file I/O, patch engine)
-├── lab.py                # Vulnerable SAAS lab (for testing)
-├── config.json           # Model IDs and provider settings
-├── requirements.txt      # Python dependencies
-├── tutorials/            # Optional playbooks loaded by agents
-├── blocked_ips.txt       # IPs blocked during Blue Team sessions
-├── attacks.log           # Record of detected attacks
-├── server.log            # Flask output (created at runtime)
-├── session.md            # Live session log (viewed by viewer.py)
-└── thoughts.json         # Agent reasoning trail
-~~~
-
----
-
-## Troubleshooting
-
-- **ModuleNotFoundError** → run `pip install -r requirements.txt` again.
-- **API Quota Exhausted** → wait a few minutes or switch to another model in `config.json`.
-- **Blue Team doesn't detect attacks** → ensure the target was started with logging (the Blue Team does this automatically for `lab.py`).
-- **Terminal output looks broken** → run `main.py` in a standard terminal; Rich formatting works best there.
-
----
-
-
-For questions or contributions, open an issue on the project's GitHub page.
+For questions or contributions, open an issue on the [GitHub repository](https://github.com/spectrum-redteam/spectrum).
