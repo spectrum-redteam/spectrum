@@ -18,7 +18,7 @@
   </a>
 </p>
 
-Spectrum is an agentic cybersecurity platform created by **Roland Poon** and **William Jiang**. It runs a fully autonomous Red Team agent that attacks and a Blue Team agent that defends — simultaneously — powered by large language models. Every action is inspected in real time by **LobsterTrap**, Spectrum's built-in guardrail engine.
+Spectrum is an agentic cybersecurity platform created by **Roland Poon**, **William Jiang**, and **Eman Mirza**. It runs a fully autonomous Red Team agent that attacks and a Blue Team agent that defends — simultaneously — powered by large language models. Every action is inspected in real time by **LobsterTrap**, Spectrum's built-in guardrail engine.
 
 Spectrum supports **Google Gemini**, **HuggingFace Inference API**, and **AMD Cloud** as LLM providers. It is built with Python and runs on most systems including macOS, Windows, and Debian or Ubuntu distributions including Kali Linux. The tool is lightweight and can be configured to use a local SQLite database and local cybersecurity tools such as Tshark, Wireshark, and John the Ripper. Wordlists are included.
 
